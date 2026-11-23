@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "科大日程",
+  "short_name": "科大日程",
+  "description": "中国科大课程、活动和截止事项日历",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f8f6",
+  "theme_color": "#0e5c52",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

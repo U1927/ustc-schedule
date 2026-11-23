@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e5c52">
+  <meta name="description" content="科大日程，把课程、校园活动和截止事项放进同一个日历。">
+  <title>科大日程</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="layout" id="workspace" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">日</span><div><strong>科大日程</strong><small>USTC SCHEDULE</small></div></div>
+      <nav aria-label="主导航">
+        <button class="nav active" type="button" aria-current="page" data-action="calendar"><span aria-hidden="true">▦</span>日历</button>
+        <button class="nav" type="button" data-import="jw"><span aria-hidden="true">◫</span>导入课表</button>
+        <button class="nav" type="button" data-import="young"><span aria-hidden="true">◇</span>校园活动</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav" type="button" data-action="settings"><span aria-hidden="true">⚙</span>设备与提醒</button>
+        <div class="account"><span class="avatar" id="avatar" aria-hidden="true"></span><div><strong id="handle"></strong><small id="sync">正在连接…</small></div></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div><p class="eyebrow">我的日历</p><h1 id="month"></h1></div>
+        <div class="top-actions">
+          <button type="button" class="button outline deadline-action" data-action="deadline">＋ 截止事项</button>
+          <button type="button" class="button primary" data-action="new">＋ <span>新建日程</span></button>
+        </div>
+      </header>
+      <div class="overview">
+        <section class="calendar" aria-label="月历">
+          <div class="calendar-bar">
+            <div class="calendar-nav">
+              <button class="button icon" type="button" data-action="prev" aria-label="上个月">‹</button>
+              <button class="button icon" type="button" data-action="next" aria-label="下个月">›</button>
+              <button class="button outline today" type="button" data-action="today">今天</button>
+            </div>
+            <span class="zone">北京时间 · UTC+8</span>
+          </div>
+          <div class="calendar-grid" id="weekdays" aria-hidden="true"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
+          <div class="calendar-grid dates" id="dates"></div>
+          <div class="legend"><span class="manual">日程</span><span class="jw">课程</span><span class="young">活动</span><span class="deadline">截止事项</span></div>
+        </section>
+        <section class="agenda" aria-labelledby="day">
+          <header><p class="eyebrow">当日安排</p><h2 id="day"></h2></header>
+          <ul id="agenda-items" class="agenda-items"></ul>
+          <p id="empty" class="empty">这天还没有安排。</p>
+          <button type="button" class="button outline agenda-add" data-action="new">＋ 添加到这天</button>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <main class="auth" id="auth">
+    <div class="auth-story"><div class="brand"><span class="brand-icon" aria-hidden="true">日</span><div><strong>科大日程</strong><small>USTC SCHEDULE</small></div></div>
+      <div><h1>课程、活动、截止事项</h1><p>在任意设备上查看自己的校园日程。</p></div>
+      <div class="auth-grid" aria-hidden="true"></div>
+    </div>
+    <section class="auth-panel"><form id="auth-form">
+      <h2 id="auth-title">登录科大日程</h2>
+      <p class="hint">使用科大日程账号在设备之间同步。</p>
+      <label>账号<input name="handle" autocomplete="username" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}" placeholder="字母、数字、下划线或连字符"></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required minlength="10" maxlength="128" placeholder="至少 10 个字符"></label>
+      <p class="form-error" id="auth-error" role="alert"></p>
+      <button class="button primary full" id="auth-submit" type="submit">登录</button>
+      <button class="text-button full" id="auth-switch" type="button" hidden>创建账号</button>
+    </form></section>
+  </main>
+
+  <dialog id="editor">
+    <form id="event-form">
+      <header class="dialog-header"><h2 id="editor-title">新建日程</h2><button class="button icon" type="button" data-close aria-label="关闭">×</button></header>
+      <label>标题<input name="title" required maxlength="160"></label>
+      <label id="type-field">类型<select name="source"><option value="manual">日程</option><option value="deadline">截止事项（DDL）</option></select></label>
+      <div class="field-row"><label><span id="start-label">开始时间</span><input name="starts" type="datetime-local" required></label><label id="end-field">结束时间<input name="ends" type="datetime-local"></label></div>
+      <label>地点<input name="place" maxlength="240"></label>
+      <label>备注<textarea name="notes" rows="3" maxlength="3000"></textarea></label>
+      <label class="reminder-label">提前提醒<select name="preset"><option value="">不提醒</option><option value="0">到时提醒</option><option value="5">5 分钟</option><option value="10">10 分钟</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option><option value="1440">1 天</option><option value="10080">1 周</option><option value="custom">自定义分钟数</option></select></label>
+      <label id="custom-field" hidden>提前多少分钟<input name="custom" type="number" min="0" max="43200" step="1"></label>
+      <a id="original" target="_blank" rel="noreferrer" hidden>在校方网页查看原文</a>
+      <p class="form-error" role="alert"></p>
+      <footer class="dialog-footer"><button class="button danger" id="delete-event" type="button" hidden>删除</button><button class="button primary" type="submit">保存</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="importer">
+    <form id="import-form">
+      <header class="dialog-header"><h2 id="import-title"></h2><button class="button icon" type="button" data-close aria-label="关闭">×</button></header>
+      <div class="source-help" id="jw-help">
+        <p>在校方网页登录并打开「我的课表」，用浏览器扩展下载课表文件后在这里上传。也可上传已有的课程日历 .ics 文件。</p>
+        <a href="https://jw.ustc.edu.cn/for-std/course-table" target="_blank" rel="noreferrer">打开教务系统</a>
+        <label>第一教学周的周一（文件中无学期日期时填写）<input type="date" name="term"></label>
+      </div>
+      <div class="source-help" id="young-help" hidden>
+        <p>在青春科大打开活动详情，用扩展下载活动文件，或复制详情正文到这里。识别后可直接添加到日历。</p>
+        <a href="https://young.ustc.edu.cn/" target="_blank" rel="noreferrer">打开青春科大</a>
+        <label>活动原链接（可选）<input name="sourceUrl" type="url" placeholder="https://young.ustc.edu.cn/…"></label>
+        <label>粘贴活动标题和正文<textarea name="content" rows="5" placeholder="标题、活动时间、地点"></textarea></label>
+      </div>
+      <label>上传导入文件<input name="file" type="file" accept=".json,.ics,application/json,text/calendar"></label>
+      <div class="import-actions"><a href="/ustc-import-extension.zip" download>下载 Chrome / Edge 扩展</a><a href="/import-help.html" target="_blank" rel="noreferrer">导入说明</a></div>
+      <p class="form-error" role="alert"></p>
+      <div id="preview" hidden><p id="import-summary" aria-live="polite"></p><ul id="import-list"></ul>
+        <label id="import-reminder">统一提前提醒（分钟，可留空）<input type="number" name="reminder" min="0" max="43200" step="1"></label>
+      </div>
+      <footer class="dialog-footer"><button class="button outline" type="submit" value="preview">识别并预览</button><button class="button primary" type="submit" value="commit" id="commit-import" hidden>一键添加</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="settings">
+    <div>
+      <header class="dialog-header"><h2>设备与提醒</h2><button class="button icon" type="button" data-close aria-label="关闭">×</button></header>
+      <p class="hint">每台设备需单独开启提醒。iPhone 需使用 iOS 16.4 或更新版本，先把应用添加到主屏幕。</p>
+      <p id="push-status" aria-live="polite"></p>
+      <div class="settings-actions"><button class="button primary" id="push-on" type="button">开启此设备提醒</button><button class="button outline" id="push-test" type="button" hidden>发送测试提醒</button><button class="button outline" id="push-off" type="button" hidden>关闭提醒</button></div>
+      <p class="hint">Windows、Android 可使用浏览器的安装菜单，Mac 可使用浏览器的安装或「添加到程序坞」菜单。</p>
+      <p class="form-error" id="settings-error" role="alert"></p>
+      <footer class="dialog-footer"><button class="button outline" id="sign-out" type="button">退出登录</button></footer>
+    </div>
+  </dialog>
+  <dialog id="young-catalog">
+    <div>
+      <header class="dialog-header"><h2>校园活动</h2><button class="button icon" type="button" data-close aria-label="关闭">×</button></header>
+      <p id="catalog-status" class="hint" aria-live="polite"></p>
+      <button type="button" class="button outline" id="direct-activity">从青春科大详情导入</button>
+      <label>添加活动时提前提醒（分钟，可留空）<input id="catalog-reminder" type="number" min="0" max="43200" step="1"></label>
+      <ul class="catalog-items" id="catalog-items"></ul>
+      <footer class="dialog-footer"><button class="button outline" type="button" id="catalog-prev" hidden>上一页</button><button class="button outline" type="button" id="catalog-next" hidden>下一页</button></footer>
+    </div>
+  </dialog>
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>
