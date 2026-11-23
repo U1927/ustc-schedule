@@ -1,27 +1,5 @@
-import { courseLessons, parseActivity, youngSource } from './school.js';
-
-async function readCourses() {
-  const page = new URL(location.href);
-  const student = page.pathname.match(/^\/for-std\/course-table\/(?:info\/)?(\d+)\/?$/)?.[1];
-  if (!student) throw new Error('请先登录，并打开教务系统的「我的课表」。');
-  const observed = performance.getEntriesByType('resource').map((entry) => new URL(entry.name)).findLast((url) =>
-    url.origin === page.origin && url.pathname === '/for-std/course-table/get-data'
-    && url.searchParams.get('dataId') === student && /^\d+$/.test(url.searchParams.get('semesterId') || ''));
-  const control = document.querySelector('select[name="semesterId"], select#semesterId, select[id*="semester" i]');
-  const query = observed?.searchParams.get('semesterId') || control?.value || page.searchParams.get('semesterId');
-  if (!/^\d+$/.test(query || '')) throw new Error('未识别到学期，请重新选择当前学期并等待课表加载。');
-  const url = new URL('/for-std/course-table/get-data', page);
-  url.search = new URLSearchParams({ bizTypeId: '2', semesterId: query, dataId: student });
-  const response = await fetch(url, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error('教务系统未返回课表，请刷新并确认登录仍有效。');
-  const payload = await response.json();
-  const snapshot = ['studentTableVm', 'lessonId2Lesson', 'lessons', 'lessonIds', 'activities', 'schedules'].reduce((result, key) => {
-    if (payload[key] !== undefined) result[key] = payload[key];
-    return result;
-  }, {});
-  const semester = payload.semester ?? payload.studentTableVm?.semester;
-  return { snapshot, monday: semester?.startDate || '' };
-}
+import { courseLessons, hasCourseTimes, parseActivity, youngSource } from './school.js';
+import { readCourses } from './jw-page.js';
 
 function readActivity() {
   if (/^\/(?:nginx_auth|login|logout)(?:\/|\.php|$)/i.test(location.pathname)) {
@@ -49,8 +27,12 @@ button.addEventListener('click', async () => {
     if (!result) throw new Error('没有读取到日程，请确认当前页已加载。');
     let file;
     if (school) {
-      const lessons = courseLessons(result.snapshot);
+      const lessons = courseLessons(result.snapshot, result.datum);
       if (!lessons.length) throw new Error('这个学期没有可导出的课程。');
+      if (!lessons.some(hasCourseTimes)) {
+        const detail = result.scheduleStatus ? `（HTTP ${result.scheduleStatus}）` : '';
+        throw new Error(`教务系统返回了课程名单，但未取得上课时间${detail}。请刷新「我的课表」后重试。`);
+      }
       const stamp = String(result.monday).slice(0, 10);
       const monday = Date.parse(`${stamp}T00:00:00Z`);
       file = { kind: 'ustc-courses', monday: Number.isFinite(monday) && new Date(monday).getUTCDay() === 1 ? stamp : '', lessons };

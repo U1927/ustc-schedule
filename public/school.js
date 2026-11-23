@@ -21,30 +21,42 @@ function scheduleSlot(activity) {
     startUnit: activity.startUnit ?? activity.startSection,
     endUnit: activity.endUnit ?? activity.endSection,
     weekIndexes: activity.weekIndexes ?? activity.weeks ?? activity.weekIndex,
-    place: localText(activity.roomName) || localText(activity.room) || localText(activity.place)
+    place: localText(activity.customPlace) || localText(activity.roomName) || localText(activity.room) || localText(activity.place)
   };
 }
 
-export function courseLessons(payload) {
+export function courseLessons(payload, datum = payload) {
   const table = payload?.studentTableVm ?? payload ?? {};
+  const schedule = datum?.result ?? datum ?? {};
   const ids = firstArray(table.lessonIds, payload?.lessonIds).map(String);
-  const details = [...firstArray(table.lessons, payload?.lessons), ...Object.values(payload?.lessonId2Lesson ?? {})];
-  const byId = new Map(details.map((lesson) => [String(lesson?.id), lesson]));
-  const data = ids.length ? [...new Set(ids)].map((id) => byId.get(id)) : details;
+  const details = [...firstArray(schedule.lessonList), ...firstArray(table.lessons, payload?.lessons),
+    ...Object.values(payload?.lessonId2Lesson ?? {})].filter((lesson) => lesson?.id != null);
+  const byId = new Map();
+  for (const lesson of details) {
+    const id = String(lesson.id);
+    byId.set(id, { ...byId.get(id), ...lesson });
+  }
+  const selected = ids.length ? [...new Set(ids)].map((id) => byId.get(id)).filter(Boolean) : [...byId.values()];
   const grouped = new Map();
-  for (const row of firstArray(table.activities, table.schedules, payload?.activities, payload?.schedules)) {
+  for (const row of firstArray(schedule.scheduleList, table.activities, table.schedules, payload?.activities, payload?.schedules)) {
     const id = String(row?.lessonId ?? row?.lesson?.id ?? '');
     if (!id) continue;
     if (!grouped.has(id)) grouped.set(id, []);
     grouped.get(id).push(row);
   }
-  return data.filter(Boolean).map((lesson) => ({
+  return selected.map((lesson) => ({
     key: String(lesson.id ?? lesson.code ?? lesson.lessonCode ?? ''),
     title: localText(lesson.courseName) || localText(lesson.course) || string(lesson.name),
     schedule: localText(lesson.dateTimePlacePersonText),
-    activities: firstArray(grouped.get(String(lesson.id)), lesson.scheduleList, lesson.vms, lesson.arrangements, lesson.activities)
+    activities: firstArray(grouped.get(String(lesson.id)), lesson.scheduleJsonParams, lesson.scheduleList, lesson.vms,
+      lesson.arrangements, lesson.activities)
       .filter((activity) => activity && typeof activity === 'object').map(scheduleSlot)
   }));
+}
+
+export function hasCourseTimes(lesson) {
+  return Boolean(string(lesson?.schedule) || firstArray(lesson?.activities).some((slot) =>
+    slot && (clockValue(slot.starts) && clockValue(slot.ends) || periods[Number(slot.startUnit) - 1])));
 }
 
 function weekNumbers(text) {
@@ -115,6 +127,9 @@ function parseCourseText(value) {
 
 export function parseCourses(file, chosenDate) {
   const lessons = Array.isArray(file?.lessons) && file.kind === 'ustc-courses' ? file.lessons : courseLessons(file);
+  if (lessons.length && !lessons.some(hasCourseTimes)) {
+    throw new Error(`文件有 ${lessons.length} 门课，但没有上课时间。请更新浏览器扩展，并在「我的课表」重新导出。`);
+  }
   const semester = validDate(chosenDate || file?.monday || '');
   const base = semester ? midnight(semester) : NaN;
   if (semester && new Date(base + 8 * 3_600_000).getUTCDay() !== 1) throw new Error('请选择第一教学周的周一。');

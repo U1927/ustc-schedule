@@ -42,4 +42,4 @@ npm start
 npm test
 ```
 
-前端位于 `public/`，学校页面导入扩展位于 `extension/`，Node 服务位于 `server/`。应用在提供扩展下载时会把共享解析模块一起打包。课表格式参考 [Life@USTC 的课表适配器](https://github.com/Life-USTC/client-core/blob/main/ustc/course_table.go)，节次时间参考 [中国科大本科生学习指南](https://www.teach.ustc.edu.cn/wp-content/uploads/2025/08/2025%E6%9C%AC%E7%A7%91%E5%AD%A6%E4%B9%A0%E6%8C%87%E5%8D%97.pdf)。
+前端位于 `public/`，学校页面导入扩展位于 `extension/`，Node 服务位于 `server/`。应用在提供扩展下载时会把共享解析模块一起打包。课表接口参考 Life@USTC 的 [选课名单适配器](https://github.com/Life-USTC/client-core/blob/main/ustc/course_table.go) 和 [课时数据适配器](https://github.com/Life-USTC/static/blob/main/src/platforms/jw.py)，节次时间参考 [中国科大本科生学习指南](https://www.teach.ustc.edu.cn/wp-content/uploads/2025/08/2025%E6%9C%AC%E7%A7%91%E5%AD%A6%E4%B9%A0%E6%8C%87%E5%8D%97.pdf)。

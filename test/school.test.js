@@ -5,6 +5,7 @@ import { at, dayKey, midnight, monthGrid } from '../public/dates.js';
 import { parseCalendar } from '../public/ical-import.js';
 import { courseLessons, parseActivity, parseCourses } from '../public/school.js';
 import { projectCatalog } from '../server/young.js';
+import { readCourses } from '../extension/jw-page.js';
 
 test('Shanghai calendar groups UTC evening in the next day', () => {
   assert.equal(dayKey(Date.parse('2026-11-22T16:30:00Z')), '2026-11-23');
@@ -36,6 +37,46 @@ test('Young detail uses activity timestamps and strips session query fields', ()
   assert.equal(parsed.sourceUrl, 'https://young.ustc.edu.cn/detail?id=1');
   assert.equal(parseActivity({ ...parsed, kind: 'ustc-activity', url: parsed.sourceUrl }).externalId, parsed.externalId);
   assert.throws(() => parseActivity('没有活动时间\n报名时间：2026-11-24 09:00'), /没有识别/);
+});
+
+test('JW extension joins selected lesson IDs to the dated timetable response', async () => {
+  const root = 'https://jw.ustc.edu.cn';
+  const selection = '/for-std/course-table/get-data?bizTypeId=2&semesterId=123&dataId=456';
+  const snapshot = { studentTableVm: { lessonIds: [22, 22] }, lessonId2Lesson: { 22: { id: 22, courseName: '测试课' } } };
+  const datum = { result: {
+    lessonList: [{ id: 22, courseName: '测试课' }, { id: 11, courseName: '未选课' }],
+    scheduleList: [
+      { lessonId: 22, date: '2026-08-31', startTime: 750, endTime: 925, room: { nameZh: '测试教室' } },
+      { lessonId: 22, date: '2026-09-04', startTime: 1400, endTime: 1535, customPlace: '测试实验室' },
+      { lessonId: 11, date: '2026-08-31', startTime: 750, endTime: 925 }
+    ]
+  } };
+  const requests = [];
+  const result = await readCourses({
+    location: { href: root + '/for-std/course-table/info/456' },
+    performance: { getEntriesByType: () => [{ name: root + selection }] },
+    document: { querySelector: () => null },
+    fetch: async (url, args) => {
+      requests.push({ url, args });
+      return Response.json(requests.length === 1 ? snapshot : datum);
+    }
+  });
+  assert.equal(requests[0].url.href, root + selection);
+  assert.equal(requests[1].url.href, root + '/ws/schedule-table/datum');
+  assert.equal(requests[1].args.method, 'POST');
+  assert.equal(requests[1].args.credentials, 'same-origin');
+  assert.deepEqual(JSON.parse(requests[1].args.body), { lessonIds: ['22'] });
+  const lessons = courseLessons(result.snapshot, result.datum);
+  assert.equal(lessons.length, 1);
+  const { events, missing } = parseCourses({ kind: 'ustc-courses', lessons });
+  assert.equal(missing, 0);
+  assert.deepEqual(events.map(({ starts, ends, place }) => [starts, ends, place]), [
+    [at('2026-08-31', '07:50'), at('2026-08-31', '09:25'), '测试教室'],
+    [at('2026-09-04', '14:00'), at('2026-09-04', '15:35'), '测试实验室']
+  ]);
+  assert.match(parseCourses(datum).events[0].place, /测试教室/);
+  const oldFile = { kind: 'ustc-courses', lessons: courseLessons(snapshot) };
+  assert.throws(() => parseCourses(oldFile, '2026-08-31'), /1 门课，但没有上课时间/);
 });
 
 test('compact teaching-unit ranges support excluded weeks and numeric weekdays', () => {

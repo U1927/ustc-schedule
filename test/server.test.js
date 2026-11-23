@@ -82,7 +82,7 @@ test('login, device sync, DDL reminder, campus import and app assets', async (t)
   const zip = await request('/ustc-import-extension.zip');
   assert.equal(zip.status, 200);
   const files = unzipSync(new Uint8Array(await zip.arrayBuffer()));
-  assert.deepEqual(Object.keys(files).sort(), ['dates.js', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'school.js']);
+  assert.deepEqual(Object.keys(files).sort(), ['dates.js', 'jw-page.js', 'manifest.json', 'popup.css', 'popup.html', 'popup.js', 'school.js']);
 
   const signout = await request('/api/session', { method: 'DELETE', body: { endpoint: subscription.endpoint }, cookie: phone });
   assert.equal(signout.status, 204);

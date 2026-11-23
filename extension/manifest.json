@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "科大日程 · 校园导入",
   "description": "从当前打开的科大课表或活动详情导出日程字段。",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "permissions": ["activeTab", "scripting"],
   "action": { "default_popup": "popup.html" }
 }

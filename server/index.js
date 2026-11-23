@@ -257,7 +257,7 @@ export function createApp({ db, origin, disableSignup = false, contact, sender, 
   app.use('/api', (req, res) => res.status(404).json({ error: '此接口不存在。' }));
   app.get('/vendor/ical.js', (req, res) => res.sendFile(fileURLToPath(import.meta.resolve('ical.js'))));
   app.get('/ustc-import-extension.zip', (req, res) => {
-    const files = Object.fromEntries(['manifest.json', 'popup.html', 'popup.js', 'popup.css'].map((name) =>
+    const files = Object.fromEntries(['manifest.json', 'popup.html', 'popup.js', 'popup.css', 'jw-page.js'].map((name) =>
       [name, readFileSync(new URL(name, extension))]));
     for (const name of ['school.js', 'dates.js']) files[name] = readFileSync(resolve(root, name));
     res.attachment('ustc-import-extension.zip').send(Buffer.from(zipSync(files)));

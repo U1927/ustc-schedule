@@ -6,4 +6,5 @@ data/
 *.sqlite*
 *.log
 coverage/
+dist/
 test-results/
