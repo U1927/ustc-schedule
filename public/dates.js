@@ -26,7 +26,29 @@ export function monthGrid(key) {
   return Array.from({ length: 42 }, (_, index) => from + index * DAY);
 }
 
-export function shiftMonth(key, delta) {
-  const [year, month] = key.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 10);
+export function calendarDays(view, key) {
+  if (view === 'month') return monthGrid(key);
+  const date = midnight(key);
+  if (view === 'day') return [date];
+  const weekdayIndex = (new Date(date + hourOffset).getUTCDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, index) => date + (index - weekdayIndex) * DAY);
+}
+
+export function shiftCalendar(view, key, delta) {
+  if (view !== 'month') return dayKey(midnight(key) + delta * (view === 'week' ? 7 : 1) * DAY);
+  const [year, month, day] = key.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month + delta, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month - 1 + delta, Math.min(day, lastDay))).toISOString().slice(0, 10);
+}
+
+export function calendarTitle(view, key, days) {
+  const [year, month, day] = key.split('-').map(Number);
+  if (view === 'month') return `${year} 年 ${month} 月`;
+  if (view === 'day') return `${year} 年 ${month} 月 ${day} 日`;
+  const [firstYear, firstMonth, firstDay] = dayKey(days[0]).split('-').map(Number);
+  const [lastYear, lastMonth, lastDay] = dayKey(days.at(-1)).split('-').map(Number);
+  const start = `${firstYear} 年 ${firstMonth} 月 ${firstDay}`;
+  if (firstYear === lastYear && firstMonth === lastMonth) return `${start}–${lastDay} 日`;
+  const end = firstYear === lastYear ? `${lastMonth} 月 ${lastDay} 日` : `${lastYear} 年 ${lastMonth} 月 ${lastDay} 日`;
+  return `${start} 日 – ${end}`;
 }

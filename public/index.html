@@ -28,27 +28,35 @@
     </aside>
     <main class="main">
       <header class="top">
-        <div><p class="eyebrow">我的日历</p><h1 id="month"></h1></div>
+        <div><p class="eyebrow">我的日历</p><h1 id="calendar-title" aria-live="polite"></h1></div>
         <div class="top-actions">
           <button type="button" class="button outline deadline-action" data-action="deadline">＋ 截止事项</button>
           <button type="button" class="button primary" data-action="new">＋ <span>新建日程</span></button>
         </div>
       </header>
-      <div class="overview">
-        <section class="calendar" aria-label="月历">
+      <div class="overview" data-calendar-view="month">
+        <section class="calendar" aria-label="日历">
           <div class="calendar-bar">
             <div class="calendar-nav">
               <button class="button icon" type="button" data-action="prev" aria-label="上个月">‹</button>
               <button class="button icon" type="button" data-action="next" aria-label="下个月">›</button>
               <button class="button outline today" type="button" data-action="today">今天</button>
             </div>
-            <span class="zone">北京时间 · UTC+8</span>
+            <div class="calendar-options">
+              <span class="zone">北京时间 · UTC+8</span>
+              <div class="view-switch" role="group" aria-label="日历视图">
+                <button type="button" data-view="day" aria-label="日视图" aria-pressed="false">日</button>
+                <button type="button" data-view="week" aria-label="周视图" aria-pressed="false">周</button>
+                <button type="button" data-view="month" aria-label="月视图" aria-pressed="true">月</button>
+              </div>
+            </div>
           </div>
           <div class="calendar-grid" id="weekdays" aria-hidden="true"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
           <div class="calendar-grid dates" id="dates"></div>
+          <div id="period-agenda" hidden></div>
           <div class="legend"><span class="manual">日程</span><span class="jw">课程</span><span class="young">活动</span><span class="deadline">截止事项</span></div>
         </section>
-        <section class="agenda" aria-labelledby="day">
+        <section class="agenda" id="month-agenda" aria-labelledby="day">
           <header><p class="eyebrow">当日安排</p><h2 id="day"></h2></header>
           <ul id="agenda-items" class="agenda-items"></ul>
           <p id="empty" class="empty">这天还没有安排。</p>

@@ -1,4 +1,4 @@
-import { DAY, at, clockText, dateTimeText, dayKey, localInput, midnight, monthGrid, parseInput, shiftMonth, weekdayText } from './dates.js';
+import { DAY, at, calendarDays, calendarTitle, clockText, dateTimeText, dayKey, localInput, midnight, parseInput, shiftCalendar, weekdayText } from './dates.js';
 import { parseActivity, parseCourses } from './school.js';
 
 const get = (selector, parent = document) => parent.querySelector(selector);
@@ -10,7 +10,8 @@ const element = (tag, className, text) => {
   return node;
 };
 const types = { manual: '日程', deadline: '截止事项', jw: '课程', young: '活动', ical: '日程' };
-const state = { session: null, selected: dayKey(), month: dayKey(), events: [], request: 0 };
+const viewLabels = { day: ['前一天', '后一天'], week: ['上一周', '下一周'], month: ['上个月', '下个月'] };
+const state = { session: null, selected: dayKey(), view: 'month', events: [], request: 0 };
 const auth = get('#auth');
 const calendar = get('#workspace');
 const authForm = get('#auth-form');
@@ -21,6 +22,10 @@ const importForm = get('#import-form');
 const settings = get('#settings');
 const catalog = get('#young-catalog');
 const toast = get('#toast');
+const overview = get('.overview');
+const dates = get('#dates');
+const periodAgenda = get('#period-agenda');
+const viewButtons = all('[data-view]', overview);
 let toastTimer;
 let registering = false;
 let editing = null;
@@ -59,11 +64,7 @@ function notify(message) {
   toastTimer = setTimeout(() => { toast.hidden = true; }, 4500);
 }
 
-function render() {
-  const [year, month] = state.month.split('-').map(Number);
-  get('#month').textContent = `${year} 年 ${month} 月`;
-  const today = dayKey();
-  const range = monthGrid(state.month);
+function eventsByDay(range) {
   const eventMap = new Map(range.map((date) => [dayKey(date), []]));
   for (const event of state.events) {
     let current = Math.max(range[0], midnight(dayKey(event.starts)));
@@ -73,40 +74,29 @@ function render() {
       current += DAY;
     }
   }
-  const dates = range.map((date) => {
-    const key = dayKey(date);
-    const events = eventMap.get(key);
-    const [y, m, d] = key.split('-').map(Number);
-    const button = element('button', 'date');
-    button.type = 'button';
-    button.dataset.date = key;
-    button.classList.toggle('muted', m !== month);
-    button.classList.toggle('selected', key === state.selected);
-    button.classList.toggle('current', key === today);
-    button.setAttribute('aria-label', `${y}年${m}月${d}日，${events.length} 项安排`);
-    button.setAttribute('aria-pressed', String(key === state.selected));
-    if (key === today) button.setAttribute('aria-current', 'date');
-    button.append(element('span', 'day-number', String(d)));
-    for (const event of events.slice(0, 2)) {
-      const chip = element('span', `calendar-event ${event.source}`, event.title);
-      chip.title = event.title;
-      chip.setAttribute('aria-hidden', 'true');
-      button.append(chip);
-    }
-    if (events.length > 2) button.append(element('span', 'calendar-count', `+${events.length - 2}`));
-    return button;
-  });
-  const focusedDate = document.activeElement?.dataset.date;
-  get('#dates').replaceChildren(...dates);
-  if (focusedDate) get(`[data-date="${focusedDate}"]`)?.focus({ preventScroll: true });
-  const selectedTime = midnight(state.selected);
-  const [, selectedMonth, selectedDay] = state.selected.split('-').map(Number);
-  get('#day').textContent = `${selectedMonth} 月 ${selectedDay} 日 · ${weekdayText(selectedTime)}`;
-  const items = (eventMap.get(state.selected) || []).map((event) => {
+  return eventMap;
+}
+
+function dateButton(date, today, count, className) {
+  const key = dayKey(date);
+  const [year, month, day] = key.split('-').map(Number);
+  const button = element('button', className);
+  button.type = 'button';
+  button.dataset.date = key;
+  button.classList.toggle('selected', key === state.selected);
+  button.classList.toggle('current', key === today);
+  button.setAttribute('aria-label', `${year}年${month}月${day}日，${count} 项安排`);
+  button.setAttribute('aria-pressed', String(key === state.selected));
+  if (key === today) button.setAttribute('aria-current', 'date');
+  return button;
+}
+
+function agendaItems(events, date) {
+  return events.map((event) => {
     const li = element('li');
     const button = element('button', `agenda-event ${event.source}`);
-    const start = event.starts < selectedTime ? '继续' : clockText(event.starts);
-    const end = event.ends > selectedTime + DAY ? '跨天' : clockText(event.ends);
+    const start = event.starts < date ? '继续' : clockText(event.starts);
+    const end = event.ends > date + DAY ? '跨天' : clockText(event.ends);
     const timing = event.source === 'deadline' ? `${start} 截止` : `${start}–${end}`;
     button.type = 'button';
     button.dataset.event = event.id;
@@ -115,16 +105,93 @@ function render() {
     li.append(button);
     return li;
   });
-  const focusedEvent = document.activeElement?.dataset.event;
+}
+
+function renderMonth(range, eventMap, today) {
+  const month = state.selected.slice(0, 7);
+  dates.replaceChildren(...range.map((date) => {
+    const key = dayKey(date);
+    const events = eventMap.get(key);
+    const button = dateButton(date, today, events.length, 'date');
+    button.classList.toggle('muted', key.slice(0, 7) !== month);
+    button.append(element('span', 'day-number', String(Number(key.slice(-2)))));
+    for (const event of events.slice(0, 2)) {
+      const chip = element('span', `calendar-event ${event.source}`, event.title);
+      chip.title = event.title;
+      chip.setAttribute('aria-hidden', 'true');
+      button.append(chip);
+    }
+    if (events.length > 2) button.append(element('span', 'calendar-count', `+${events.length - 2}`));
+    return button;
+  }));
+  const selectedTime = midnight(state.selected);
+  const [, selectedMonth, selectedDay] = state.selected.split('-').map(Number);
+  get('#day').textContent = `${selectedMonth} 月 ${selectedDay} 日 · ${weekdayText(selectedTime)}`;
+  const items = agendaItems(eventMap.get(state.selected), selectedTime);
+  get('#month-agenda').dataset.agendaDate = state.selected;
   get('#agenda-items').replaceChildren(...items);
-  if (focusedEvent) get(`[data-event="${focusedEvent}"]`)?.focus({ preventScroll: true });
   get('#empty').hidden = items.length > 0;
+}
+
+function renderPeriod(range, eventMap, today) {
+  const weekly = state.view === 'week';
+  periodAgenda.className = weekly ? 'week-agenda' : 'day-agenda';
+  periodAgenda.replaceChildren(...range.map((date) => {
+    const key = dayKey(date);
+    const events = eventMap.get(key);
+    const group = element('section', 'period-day');
+    group.dataset.agendaDate = key;
+    group.classList.toggle('selected', key === state.selected);
+    const header = element('h2', 'period-heading');
+    if (weekly) {
+      const [, month, day] = key.split('-').map(Number);
+      const button = dateButton(date, today, events.length, 'week-day');
+      button.append(element('span', '', weekdayText(date)), element('strong', '', `${month}/${day}`));
+      header.append(button);
+    } else {
+      header.textContent = weekdayText(date);
+    }
+    group.append(header);
+    if (events.length) {
+      const list = element('ul', 'agenda-items');
+      list.append(...agendaItems(events, date));
+      group.append(list);
+    } else {
+      group.append(element('p', 'period-empty', '无安排'));
+    }
+    return group;
+  }));
+}
+
+function render() {
+  const { selected, view } = state;
+  const range = calendarDays(view, selected);
+  const today = dayKey();
+  const monthly = view === 'month';
+  const active = document.activeElement;
+  const activeDay = active?.closest('[data-agenda-date]')?.dataset.agendaDate;
+  const eventMap = eventsByDay(range);
+  overview.dataset.calendarView = view;
+  get('#calendar-title').textContent = calendarTitle(view, selected, range);
+  get('[data-action="prev"]', overview).setAttribute('aria-label', viewLabels[view][0]);
+  get('[data-action="next"]', overview).setAttribute('aria-label', viewLabels[view][1]);
+  for (const button of viewButtons) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+  dates.hidden = !monthly;
+  get('#weekdays').hidden = !monthly;
+  get('#month-agenda').hidden = !monthly;
+  periodAgenda.hidden = monthly;
+  if (monthly) renderMonth(range, eventMap, today);
+  else renderPeriod(range, eventMap, today);
+  const visible = monthly ? [dates, get('#month-agenda')] : [periodAgenda];
+  const target = active?.dataset.date ? `[data-date="${active.dataset.date}"]`
+    : active?.dataset.event ? `[data-agenda-date="${activeDay}"] [data-event="${active.dataset.event}"]` : '';
+  if (target && !active.isConnected) visible.map((section) => get(target, section)).find(Boolean)?.focus({ preventScroll: true });
 }
 
 async function syncEvents({ quiet = false } = {}) {
   if (!state.session) return;
   const request = ++state.request;
-  const days = monthGrid(state.month);
+  const days = calendarDays(state.view, state.selected);
   try {
     const events = await api(`/events?from=${days[0]}&to=${days.at(-1) + DAY}`);
     if (request !== state.request) return;
@@ -140,12 +207,12 @@ async function syncEvents({ quiet = false } = {}) {
   }
 }
 
-function selectDay(key) {
-  const sameMonth = state.month.slice(0, 7) === key.slice(0, 7);
+function selectDay(key, view = state.view) {
+  const sameRange = view === state.view && calendarDays(view, state.selected)[0] === calendarDays(view, key)[0];
   state.selected = key;
-  state.month = key;
+  state.view = view;
   render();
-  if (!sameMonth) void syncEvents();
+  if (!sameRange) void syncEvents();
 }
 
 function setSession(session) {
@@ -165,7 +232,8 @@ function setSession(session) {
     state.events = [];
     for (const dialog of [editor, importer, settings, catalog]) if (dialog.open) dialog.close();
     get('#agenda-items').replaceChildren();
-    get('#dates').replaceChildren();
+    dates.replaceChildren();
+    periodAgenda.replaceChildren();
   }
 }
 
@@ -510,6 +578,7 @@ document.addEventListener('click', (event) => {
   const button = event.target.closest('button');
   if (!button) return;
   if (button.hasAttribute('data-close')) button.closest('dialog').close();
+  if (button.dataset.view && button.dataset.view !== state.view) selectDay(state.selected, button.dataset.view);
   if (button.dataset.date) selectDay(button.dataset.date);
   if (button.dataset.event) {
     const item = state.events.find((row) => row.id === button.dataset.event);
@@ -523,8 +592,8 @@ document.addEventListener('click', (event) => {
   }
   switch (button.dataset.action) {
     case 'calendar': window.scrollTo({ top: 0 }); break;
-    case 'prev': selectDay(shiftMonth(state.month, -1)); break;
-    case 'next': selectDay(shiftMonth(state.month, 1)); break;
+    case 'prev': selectDay(shiftCalendar(state.view, state.selected, -1)); break;
+    case 'next': selectDay(shiftCalendar(state.view, state.selected, 1)); break;
     case 'today': selectDay(dayKey()); break;
     case 'new': openEditor(); break;
     case 'deadline': openEditor(null, 'deadline'); break;

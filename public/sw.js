@@ -1,4 +1,4 @@
-const VERSION = 'ustc-schedule-v1';
+const VERSION = 'ustc-schedule-v2';
 const SHELL = ['/', '/styles.css', '/app.js', '/dates.js', '/school.js', '/ical-import.js', '/vendor/ical.js',
   '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png', '/import-help.html'];
 
